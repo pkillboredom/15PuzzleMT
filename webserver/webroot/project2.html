@@ -1,0 +1,280 @@
+<html>
+<head>
+<title> CSE451, Project 2, Threads </title>
+</head>
+<body>
+
+<h1> Project 2: Programming with threads </h1>
+
+This assignment is designed to give you experience working with Java
+threads in a wide variety of scenarios.  This project does not involve VMWare. 
+You should do this project in your project teams.
+
+<hr>
+
+<h3> Preleminaries </h3>
+
+For this project, you can use any Linux machine, <i> as long as it is
+a multi-processor </i>.  How can you tell if a machine is a
+multi-processor?  The file <i> /proc/cpuinfo </i> has information about the
+processor(s) on a system.  You can list its contents using the command 'more
+/proc/cpuinfo'. 
+<p>
+You have all been given accounts on a 4-way multiprocessor,
+amlia.cs.washington.edu.  In addition, most or all lab Linux machines are
+multi-processors.  
+<p>
+To get started, first download the <a href="os-project2.tar">
+scaffolding files </a>. Use the command 'tar xvf os-project2.tar' to
+unpack this tar file. 
+There are four sub-directories under src/, corresponding to the four
+parts of the assignment (the jars directory contains helper
+functionality; you do not need to look in there).  Each sub-directory
+has a makefile, which supports the "make" target (for building code)
+and  the "make run" target (for running code).  Also, 'make clean'
+deletes .class files and emacs backup files. <p>
+
+Note that any  new Java files will be automatically compiled.
+You should not need to modify the Makefiles.
+
+<h3> Requirements </h3>
+
+To get a good grade on this project, your programs must use
+appropriate synchronization to ensure thread-safe operation. Remember,
+a program is not thread-safe unless it is correct under <b> all
+possible schedule interleavings </b>.  In other words, no matter what
+the scheduler does, your program must do the right thing.  This is why
+writing concurrent programs is so difficult.
+<p>
+Note that bugs in concurrent programs are often called
+<a href="http://en.wikipedia.org/wiki/Heisenbug"> Heisenbugs </a>.
+This is because they have an annoying tendancy to disappear or mutate
+under inspection.  This is why it is particularly important to get the
+program right the first time.
+<p>
+How do you write thread-safe programs?  A good start is to follow the
+two rules we laid down in class: 1) Any shared, mutable state must be
+properly synchronized; and 2) Compound actions must be protected by a
+single lock.  
+
+
+<hr>
+
+<h2> Part 1: Semaphores</h2>
+
+A <em> semaphore </em> is a well-known synchronization primitive,
+which is heavily used throughout the Linux kernel.  A semaphore
+represents a thread-safe integer, which supports methods for
+incrementing and decrementing its value (up and down, respectively).
+In addition, any attempt to decrement the semaphore below zero will
+cause the decrementing thread to block.  Incrementing the semaphore
+causes a single sleeping thread to awaken.  You can read more about
+semaphores in Silbershatz section 6.5 (note that the author refers to
+"up" and "down" as "signal" and "wait").
+<p>
+Your assignment for part 1 is to implement semaphores using built-in
+Java functionality (e.g., locks and condition variables).  You can use
+any feature of Java, except <i> java.util.concurrent.Semaphore </i>
+(or, any other off-the-shelf implementation of Semaphores).  However, 
+the <a
+       href="http://java.sun.com/j2se/1.5.0/docs/api/java/util/concurrent/Semaphore.html">
+    Java documentation </a> does provide some useful documentation on
+Semaphore behavior.
+
+<p>
+For this part, the scaffolding code in Semaphore.java provides the
+semaphore interface, which you are required to fill in.  In addition,
+the <em> make run </em> command invokes a simple test routine.  Note
+that the semaphore in this example should behave exactly like a lock
+(i.e., only one thread in the critical section at a time).
+
+<h2> Part 2: Approximating &pi; </h2>
+
+For this problem, you will approximate the mathematical constant &pi;
+using a simple, randomized algorithm.  You will measure the
+performance of the algorithm using a variable number of threads. 
+
+<p>
+Consider a circle or radius r inscribed in a square:
+<p>
+<img src="circle-in-square.tiff">
+<p>
+
+From basic geometry, we know the areas of the circle and the square
+(&pi; r^2 and 4 r^2, respectively).<p>
+
+In addition, we can use a large number of random points to estimate
+the ratio of the circle's area to the square's area, as shown in the
+following pseudocode: <p> 
+
+<pre>
+int pointsInCircle = 0;
+for i=0..NUM_SAMPLES {
+  Point p = chooseRandomPointInSquare();
+  if (p.insideCircle())
+    pointsInCircle++;
+}
+
+float areaRatio = (float) pointsInCircle / NUM_SAMPLES;
+</pre>
+
+<h4> Step 1: Calculate &pi; </h4>
+
+Using the information provided above, write a multi-threaded program
+that approximates &pi;.  The program should function by 
+generating a large number of sample points.  Each thread should
+perform some subset of the total work.  Your program should
+replace the stub code in StubCalculator.java:
+
+<pre>
+public double calculate(int numSamples, int numThreads) {
+    return 0.0; // TODO: implement this!
+}
+</pre>
+
+<b> Key point: </b> The number of random samples should be a fixed
+constant that does not depend on the number of threads.  So, with K
+samples and N threads, each thread does K/N random samples.
+
+
+<h4> Step 2: Benchmark </h4>
+
+Finally, benchmark your &pi; calculator using a variable number of
+threads.  You should submit a  writeup that includes a graph with
+threads on the x-axis and latency on the y-axis.  The number of
+threads should range from 1 to roughly 10.
+<p>  
+In addition, your writeup should
+provide an explanation of this graph.  In particular, you should
+explain your results in terms of Amdahl's law (what are N and F for
+this experiment?).
+
+<h4> Hints </h4>
+<ul>
+<li> I would start by implementing a single-threaded pi calculator.
+  You can do this by simply ignoring the numThreads argument.  Once
+  you have this working, you can parallelize the work across multiple
+  threads.  
+<li> You may need <em> a lot </em> of samples to get a good estimate.
+  Start with around 20 million.
+<li> You should build on Java's random number generation in <a
+   href="http://java.sun.com/j2se/1.4.2/docs/api/java/util/Random.html">
+   java.util.Random </a>
+<li> ...and Java timer functionality in System.currentTimeMillis()
+<li> If you are running on a shared machine, make sure your results
+  are not skewed by someone else's experiment.  One way to guard
+  against this is to run the UNIX top application, which shows which
+  processes are consuming CPU resources.
+<li> For processor information, read /proc/cpuinfo on Linux.
+</ul>
+
+
+<h2> Part 3: Multi-threaded web server </h2>
+
+Web servers are frequently implemented as multi-threaded
+applications.  This is done for two reasons.  First, multiple threads
+allows the web server to utilize multiple processors.  Second, 
+using threads provides a convenient way to allow each processor to
+handle multiple requests in parallel. For the latter reason, it makes
+sense to run a multi-threaded web server, even on a uniprocessor machine.
+
+For background, you should look at the following <a
+   href="http://www.onjava.com/pub/a/onjava/2003/04/23/java_webserver.html">
+Web server overview </a>.  Note that the web server code in
+   scaffolding is derived from this web server.
+
+<h4> Step 1: A multi-threaded web server </h4>
+
+<h4> Step 2: Benchmark </h4> 
+
+<h4> Step 3: Add a "statistics" page </h4>
+
+<i> More details to follow </i>
+
+<p>
+
+<h2> Part 4: GUI Hacking </h2>
+
+Graphical user interface frameworks are usually single-threaded.  This
+means that all GUI-related processing is done in a single thread.
+Unfortunately, this design can cause graphical applications to become
+unresponsive <em> if </em> there are long-running computations that
+occur in response to GUI events.  For example, a very long spell-check
+operation could cause a word processor to freeze up.  For this reason,
+long-lived tasks are usually deferred to a separate thread.  This
+improves responsiveness, but introduces synchronization issues.
+<p>
+For this part of the project, we provide you with a basic GUI which 
+calculates the first N fibonacci numbers.  Your task is to implement
+the "cancel" button, which stops a long-lived Fibonacci computation in
+its tracks.  This is trickier than it sounds, because it requires
+digging into the details of how Java's GUI framework (called Swing)
+manages threads and concurrency.  
+
+<h4> GUI operation </h4>
+
+First, run the existing GUI by typing "make run" in the fibogui
+directory.  Try typing in a small number like 5 and pressing return.
+This should print out the first five fibonacci numberes.
+Next, try typing in a large number like 45.  You should notice that
+the GUI becomes completely unresponsive.  In fact, you may need to
+kill the application from the command-line with ctrl-c.
+<p>
+Your job is to implement the cancel button.  Task cancellation should
+stop the current computation, but should display the results that have
+been obtained so far.  In other words, don't throw away work that has
+been done; it is OK to display a partial result on the screen. 
+<p>
+<i> (You might notice that the implementation of Fibonnaci is
+particularly slow.  This was done intentionally to make the system do
+more work.  You shouldn't try to optimize the provided fibonacci
+algorithm.  This is operating systems, not algorithms...)</i> 
+
+<p>
+<i> (BTW, no fair making fun of the GUI.  This is operating systems,
+  not HCI...) </i>
+
+<h4> How to get started  </h4>
+
+To get started, you should read <a
+	href="http://java.sun.com/docs/books/tutorial/uiswing/misc/threads.html">
+	Sun's documentation </a> on thread-safe GUIs.  In particular,
+	you should understand the method <em>
+	SwingUtilities.invokeLater</em>.  What does
+	it do, and why is it necessary?  Only once you <b> deeply </b>
+	understand this should you attempt to modify code.
+<p>
+In addition, you will need to understand how thread interruption works
+in Java.  Read 
+<a href="http://java.sun.com/j2se/1.5.0/docs/api/java/lang/Thread.html">
+Sun's documentation</a>, and ask your TAs or instructor if you have questions. 
+
+<h4> Bonus: Incremental Display </h4>
+
+The current fibogui displays its results all at once.  Modify the GUI
+to display results incrementally (as they are calculated).  In this
+case, the cancel button should simply stop computing new numbers.
+
+<hr>
+
+<h2> What to handin </h2>
+
+You should handin the src/ directory, which contains your modified Java
+files.  You do not need to turn in the .class files (although it is
+not a problem if you do).  In addition, you should submit a writeup
+that contains an analysis of the &pi; calculator and the
+multi-threaded web server.  This writeup can be in Word format, pdf
+format, or plain text.  If you have graphs in separate files, please
+indicate this at the top of your writeup.
+<p>
+We will test your solutions by invoking 'make run'.  So, make sure
+this does something sensible for each of your solutions.
+
+<h3> Grading </h3>
+
+Semaphores: 20 points <br>
+&pi; calculator: 25 points <br>
+Web server: 30 points <br>
+Fibonacci GUI: 25 points (plus 10 possible bonus points)
+</body>
+</html>
