@@ -1,5 +1,6 @@
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.*;
 
 
 /**
@@ -11,7 +12,12 @@ import java.util.List;
  * 
  * @author andrew
  */
+
+
 public class FifteenPuzzleSolver {
+
+    private ExecutorService threadPool;
+    private List<Board> boardSolution;
 
 	public static void main(String [] args) {
 		int threadCount = 1;
@@ -39,7 +45,8 @@ public class FifteenPuzzleSolver {
 	
 	public FifteenPuzzleSolver(int threadCount) {
 		if (threadCount > 1)
-			throw new RuntimeException("No support for multiple threads :(");		
+			//throw new RuntimeException("No support for multiple threads :(");
+            threadPool = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
 	}
 	
 	public List<Board> solve (Board board) {
@@ -49,17 +56,19 @@ public class FifteenPuzzleSolver {
 		// note: program searches forever.  At each iteration, it searchers for solutions that
 		// have an increasing number of maximum moves (as reflected in maxDepth).
 		while (true) {
-			List<Board> solution = doSolve(board,0,maxDepth);
-			
-			if (solution != null) {
-				return solution;
+			//List<Board> solution = doSolve(board,0,maxDepth);
+            threadPool.execute(new doSolveWorker(board,0,maxDepth));
+
+			if (boardSolution != null) {
+				return boardSolution;
 			}
 			else {
 				maxDepth++; // search again, with a larger maxDepth
 			}
 		}
 	}
-	
+
+
 	/**
 	 * Look for solution with up to maxDepth moves
 	 * 
@@ -95,4 +104,29 @@ public class FifteenPuzzleSolver {
 		// no successor moves were fruitful
 		return null;
 	}
+
+    private class doSolveWorker implements Runnable
+    {
+        private Board currentBoard;
+        private int maxDepth;
+        private int currentDepth;
+
+        public doSolveWorker(Board board, int currentDepth, int maxDepth)
+        {
+            currentBoard = board;
+            this.currentDepth = currentDepth;
+            this.maxDepth = maxDepth;
+            System.out.println("Thread spawned with depth " + maxDepth);
+        }
+
+        public void run()
+        {
+            List<Board> out = doSolve(currentBoard, currentDepth, maxDepth);
+            if (out != null)
+            {
+                boardSolution = out;
+            }
+        }
+    }
+
 }
