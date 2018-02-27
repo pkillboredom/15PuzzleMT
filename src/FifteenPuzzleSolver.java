@@ -18,6 +18,7 @@ public class FifteenPuzzleSolver {
 
     private ExecutorService threadPool;
     private List<Board> boardSolution;
+    Semaphore threadRateLimit = new Semaphore(10);
 
 	public static void main(String [] args) {
 		int threadCount = 1;
@@ -52,15 +53,32 @@ public class FifteenPuzzleSolver {
 	public List<Board> solve (Board board) {
 				
 		int maxDepth = board.minimumSolutionDepth();
+		boardSolution = null;
 		
 		// note: program searches forever.  At each iteration, it searchers for solutions that
 		// have an increasing number of maximum moves (as reflected in maxDepth).
+        int threadsQueued = 0;
 		while (true) {
 			//List<Board> solution = doSolve(board,0,maxDepth);
+
+            try {
+                threadRateLimit.acquire(1);
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
             threadPool.execute(new doSolveWorker(board,0,maxDepth));
 
 			if (boardSolution != null) {
-				return boardSolution;
+			    threadPool.shutdownNow();
+                try {
+                    threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.MINUTES);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                //System.out.println(maxDepth);
+                //return solution;
 			}
 			else {
 				maxDepth++; // search again, with a larger maxDepth
@@ -126,6 +144,7 @@ public class FifteenPuzzleSolver {
             {
                 boardSolution = out;
             }
+            threadRateLimit.release(1);
         }
     }
 
