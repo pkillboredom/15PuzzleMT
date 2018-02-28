@@ -1,6 +1,7 @@
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
 
 
 /**
@@ -12,13 +13,10 @@ import java.util.concurrent.*;
  * 
  * @author andrew
  */
-
-
 public class FifteenPuzzleSolver {
 
-    private ExecutorService threadPool;
-    private List<Board> boardSolution;
-    Semaphore threadRateLimit = new Semaphore(10);
+	private ExecutorService threadPool;
+	private int arb;
 
 	public static void main(String [] args) {
 		int threadCount = 1;
@@ -27,7 +25,8 @@ public class FifteenPuzzleSolver {
 			threadCount = Integer.parseInt(args[0]);
 		
 		FifteenPuzzleSolver fps = new FifteenPuzzleSolver(threadCount);
-		Board board = Board.createBoard();
+		Board board = new Board();
+		board = Board.createBoard();
 		
 		System.out.println("Using " + threadCount + " threads to solve this board: \n" + board);
 		System.out.println();
@@ -45,59 +44,43 @@ public class FifteenPuzzleSolver {
 	}
 	
 	public FifteenPuzzleSolver(int threadCount) {
-		if (threadCount > 1)
-			//throw new RuntimeException("No support for multiple threads :(");
-            threadPool = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+		threadPool = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
 	}
 	
 	public List<Board> solve (Board board) {
-				
+		board.threadPoolRef = threadPool;
+		if(!board.boardMade)
+		{
+			board = board.createBoard();
+		}
 		int maxDepth = board.minimumSolutionDepth();
-		boardSolution = null;
 		
 		// note: program searches forever.  At each iteration, it searchers for solutions that
 		// have an increasing number of maximum moves (as reflected in maxDepth).
-        int threadsQueued = 0;
 		while (true) {
-			//List<Board> solution = doSolve(board,0,maxDepth);
-
-            try {
-                threadRateLimit.acquire(1);
-            }
-            catch (InterruptedException e)
-            {
-                e.printStackTrace();
-            }
-            threadPool.execute(new doSolveWorker(board,0,maxDepth));
-
-			if (boardSolution != null) {
-			    threadPool.shutdownNow();
-                try {
-                    threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.MINUTES);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                //System.out.println(maxDepth);
-                //return solution;
+			List<Board> solution = doSolve(board,0,maxDepth);
+			
+			if (solution != null) {
+				return solution;
 			}
 			else {
 				maxDepth++; // search again, with a larger maxDepth
 			}
 		}
 	}
-
-
+	
 	/**
 	 * Look for solution with up to maxDepth moves
 	 * 
 	 * @param board: The board to be solved
-	 * @param solution: The list of moves so far
 	 * @param currentDepth: The number of moves so far
 	 * @param maxDepth: The maximum number of moves before we quit.
 	 * 
 	 * @return A valid solution (sequence of boards) or null to indicate failure
 	 */
 	private List<Board> doSolve(Board board, int currentDepth, int maxDepth) {
+		arb++;
+		System.out.println("DEBUG: doSolve called (i.e. still running) " + arb);
 		if (board.isSolved()) {
 			List<Board> list = new LinkedList<Board>();
 			list.add(board);
@@ -109,7 +92,9 @@ public class FifteenPuzzleSolver {
 			return null;
 		
 		// search for neighboring moves...
-		List<Board> nextMoves = board.generateSuccessors();
+
+		List<Board> nextMoves = board.generateSuccessorsThreaded();
+
 		for (Board nextBoard : nextMoves) {
 			List<Board> solution = doSolve(nextBoard,currentDepth+1,maxDepth);
 			if (solution != null) {
@@ -122,30 +107,4 @@ public class FifteenPuzzleSolver {
 		// no successor moves were fruitful
 		return null;
 	}
-
-    private class doSolveWorker implements Runnable
-    {
-        private Board currentBoard;
-        private int maxDepth;
-        private int currentDepth;
-
-        public doSolveWorker(Board board, int currentDepth, int maxDepth)
-        {
-            currentBoard = board;
-            this.currentDepth = currentDepth;
-            this.maxDepth = maxDepth;
-            System.out.println("Thread spawned with depth " + maxDepth);
-        }
-
-        public void run()
-        {
-            List<Board> out = doSolve(currentBoard, currentDepth, maxDepth);
-            if (out != null)
-            {
-                boardSolution = out;
-            }
-            threadRateLimit.release(1);
-        }
-    }
-
 }

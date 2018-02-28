@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.*;
 
 
 /**
@@ -16,12 +17,16 @@ public class Board {
 	private static final int INITIALIZATION_MOVES = 55;
 	
 	private final int[] board;
+
+	public boolean boardMade = false;
+	public static ExecutorService threadPoolRef;
 	
 	/**
 	 * Create a randomized initial board
 	 */
 	public static Board createBoard() {
 		Board b = new Board();
+		b.threadPoolRef = threadPoolRef;
 		for (int i = 0;i<INITIALIZATION_MOVES;i++) {
 			List<Board> nextBoards = b.generateSuccessors();
 			
@@ -33,7 +38,7 @@ public class Board {
 	}
 	
 	// initialize a solved board
-	private Board () {
+	public Board () {
 		board = new int[16] ;
 	
 		for (int i=0;i<16;i++)
@@ -64,24 +69,104 @@ public class Board {
 	}
 	
 	// generate all valid board configurations within one move of this board
+	public List<Board> generateSuccessorsThreaded() {
+		List<Board> list = new ArrayList<Board>();
+		int emptyIndex = this.getEmptyIndex();
+		Semaphore tryPermits = new Semaphore(4);
+		
+		// above
+		Runnable tryMove1 = (new Runnable() {
+			@Override
+			public void run() {
+				try {
+					tryPermits.acquire(1);
+				}
+				catch (InterruptedException e){
+					e.printStackTrace();
+				}
+				tryToAddMove(list,emptyIndex,emptyIndex - 4);
+				tryPermits.release(1);
+			}
+		});
+		threadPoolRef.execute(tryMove1);
+		
+		// below
+		Runnable tryMove2 = (new Runnable() {
+			@Override
+			public void run() {
+				try {
+					tryPermits.acquire(1);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				tryToAddMove(list, emptyIndex, emptyIndex + 4);
+				tryPermits.release(1);
+			}
+		});
+		threadPoolRef.execute(tryMove2);
+		
+		// left
+		Runnable tryMove3;
+		if ( (emptyIndex % 4) != 0) {
+			tryMove3 = (new Runnable() {
+				@Override
+				public void run() {
+					try {
+						tryPermits.acquire(1);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					tryToAddMove(list, emptyIndex, emptyIndex - 1);
+					tryPermits.release(1);
+				}
+			});
+			threadPoolRef.execute(tryMove3);
+		}
+		
+		// right
+		Runnable tryMove4;
+		if ( (emptyIndex % 4) != 3) {
+			tryMove4 = (new Runnable() {
+				@Override
+				public void run() {
+					try {
+						tryPermits.acquire(1);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					tryToAddMove(list, emptyIndex, emptyIndex + 1);
+					tryPermits.release(1);
+				}
+			});
+			threadPoolRef.execute(tryMove4);
+		}
+
+		try {
+			tryPermits.acquire(4);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		return list;
+	}
+
 	public List<Board> generateSuccessors() {
 		List<Board> list = new ArrayList<Board>();
 		int emptyIndex = this.getEmptyIndex();
-		
+
 		// above
 		tryToAddMove(list,emptyIndex,emptyIndex - 4);
-		
+
 		// below
 		tryToAddMove(list,emptyIndex,emptyIndex + 4);
-		
+
 		// left
 		if ( (emptyIndex % 4) != 0)
 			tryToAddMove(list,emptyIndex,emptyIndex - 1);
-		
+
 		// right
 		if ( (emptyIndex % 4) != 3)
 			tryToAddMove(list,emptyIndex,emptyIndex  + 1);
-		
+
 		return list;
 	}
 
@@ -93,8 +178,10 @@ public class Board {
 		
 		copy[emptyIndex] = copy[targetIndex];
 		copy[targetIndex] = 0;
-		
-		list.add(new Board(copy));
+
+		Board newBoardCopy = new Board(copy);
+		newBoardCopy.threadPoolRef = threadPoolRef;
+		list.add(newBoardCopy);
 	}
 	
 	public boolean isSolved() {
