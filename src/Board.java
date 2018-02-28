@@ -17,6 +17,7 @@ public class Board {
 	private static final int INITIALIZATION_MOVES = 55;
 	
 	private final int[] board;
+	public Semaphore listRWSem = new Semaphore(1);
 
 	public boolean boardMade = false;
 	public static ExecutorService threadPoolRef;
@@ -26,7 +27,6 @@ public class Board {
 	 */
 	public static Board createBoard() {
 		Board b = new Board();
-		b.threadPoolRef = threadPoolRef;
 		for (int i = 0;i<INITIALIZATION_MOVES;i++) {
 			List<Board> nextBoards = b.generateSuccessors();
 			
@@ -69,12 +69,13 @@ public class Board {
 	}
 	
 	// generate all valid board configurations within one move of this board
-	public List<Board> generateSuccessorsThreaded() {
+	public synchronized List<Board> generateSuccessorsThreaded() {
 		List<Board> list = new ArrayList<Board>();
 		int emptyIndex = this.getEmptyIndex();
-		Semaphore tryPermits = new Semaphore(4);
+		Semaphore tryPermits = new Semaphore(4); // use this semaphore we only return a done list.
 		
 		// above
+        // In this version of the method, we are running new anonymous threads to do the tryAddMove concurrently.
 		Runnable tryMove1 = (new Runnable() {
 			@Override
 			public void run() {
@@ -146,6 +147,8 @@ public class Board {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
+		tryPermits.release(4); // we immediately release cause we just want to block until above threads are done.
+
 		return list;
 	}
 
@@ -171,6 +174,7 @@ public class Board {
 	}
 
 	private  final void tryToAddMove(List<Board> list, int emptyIndex, int targetIndex) {
+
 		if (! isValidIndex(targetIndex))
 			return;
 		int [] copy = new int[16];
@@ -180,8 +184,15 @@ public class Board {
 		copy[targetIndex] = 0;
 
 		Board newBoardCopy = new Board(copy);
-		newBoardCopy.threadPoolRef = threadPoolRef;
+		try {
+            listRWSem.acquire(1);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
 		list.add(newBoardCopy);
+		listRWSem.release(1);
 	}
 	
 	public boolean isSolved() {

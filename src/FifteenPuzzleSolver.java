@@ -45,6 +45,7 @@ public class FifteenPuzzleSolver {
 	
 	public FifteenPuzzleSolver(int threadCount) {
 		threadPool = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+		Board.threadPoolRef = threadPool;
 	}
 	
 	public List<Board> solve (Board board) {
@@ -52,6 +53,7 @@ public class FifteenPuzzleSolver {
 		if(!board.boardMade)
 		{
 			board = board.createBoard();
+			board.boardMade = true;
 		}
 		int maxDepth = board.minimumSolutionDepth();
 		
@@ -79,8 +81,7 @@ public class FifteenPuzzleSolver {
 	 * @return A valid solution (sequence of boards) or null to indicate failure
 	 */
 	private List<Board> doSolve(Board board, int currentDepth, int maxDepth) {
-		arb++;
-		System.out.println("DEBUG: doSolve called (i.e. still running) " + arb);
+		System.out.println("DEBUG: doSolve called (i.e. still running) " + maxDepth);
 		if (board.isSolved()) {
 			List<Board> list = new LinkedList<Board>();
 			list.add(board);
@@ -96,12 +97,22 @@ public class FifteenPuzzleSolver {
 		List<Board> nextMoves = board.generateSuccessorsThreaded();
 
 		for (Board nextBoard : nextMoves) {
+		    try
+            {
+                nextBoard.listRWSem.acquire(1);
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
 			List<Board> solution = doSolve(nextBoard,currentDepth+1,maxDepth);
 			if (solution != null) {
 				// prepend this board to the solution, and return
 				solution.add(0,board);
+                nextBoard.listRWSem.release(1);
 				return solution;
 			}
+            nextBoard.listRWSem.release(1);
 		}
 		
 		// no successor moves were fruitful
