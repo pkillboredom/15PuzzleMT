@@ -82,7 +82,7 @@ public class FifteenPuzzleSolver {
 	 * @return A valid solution (sequence of boards) or null to indicate failure
 	 */
 	private List<Board> doSolve(Board board, int currentDepth, int maxDepth) {
-		System.out.println("DEBUG: doSolve called (i.e. still running) " + maxDepth);
+		//System.out.println("DEBUG: doSolve called (i.e. still running) " + maxDepth);
 		if (board.isSolved()) {
 			List<Board> list = new LinkedList<Board>();
 			list.add(board);
@@ -99,17 +99,6 @@ public class FifteenPuzzleSolver {
 
 		for (int i = 0; i < nextMoves.size(); i++) {
 		    Board nextBoard = nextMoves.get(i);
-            try {
-                if(nextBoard.listRWSem.availablePermits() < 1) System.out.println("listRWSem is blocked on thread " + Thread.currentThread().getId() +". Will acquire when free...");
-                nextBoard.listRWSem.acquire(1);
-                System.out.println("listRWSem Acquired by thread " + Thread.currentThread().getId());
-            }
-            catch (InterruptedException e)
-            {
-                e.printStackTrace();
-            }
-            System.out.println("listRWSem released by thread " + Thread.currentThread().getId());
-            nextBoard.listRWSem.release(1);
 			List<Board> solution = doSolve(nextBoard,currentDepth+1,maxDepth);
 			if (solution != null) {
 			    // Shutdown the thread pool

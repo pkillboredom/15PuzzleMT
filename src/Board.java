@@ -69,94 +69,71 @@ public class Board {
 	}
 	
 	// generate all valid board configurations within one move of this board
-	public synchronized List<Board> generateSuccessorsThreaded() {
+	public List<Board> generateSuccessorsThreaded() {
 		List<Board> list = new ArrayList<Board>();
 		int emptyIndex = this.getEmptyIndex();
-		Semaphore tryPermits = new Semaphore(4); // use this semaphore we only return a done list.
 		
 		// above
         // In this version of the method, we are running new anonymous threads to do the tryAddMove concurrently.
-		Runnable tryMove1 = (new Runnable() {
+        Future<Board> board1 = null;
+		Callable<Board> tryMove1 = (new Callable<Board>() {
 			@Override
-			public void run() {
-				try {
-				    System.out.println("TryMove1 is about to acquire tryPermit semaphore.");
-					tryPermits.acquire(1);
-				}
-				catch (InterruptedException e){
-					e.printStackTrace();
-				}
-				tryToAddMove(list,emptyIndex,emptyIndex - 4);
-				System.out.println("TryMove1 has performed tryToAddMove. Now releasing...");
-				tryPermits.release(1);
+			public Board call() {
+				Board b = tryToAddMove(emptyIndex,emptyIndex - 4);
+				return b;
 			}
 		});
-		threadPoolRef.execute(tryMove1);
+		board1 = threadPoolRef.submit(tryMove1);
 		
 		// below
-		Runnable tryMove2 = (new Runnable() {
+        Future<Board> board2 = null;
+		Callable<Board> tryMove2 = (new Callable<Board>() {
 			@Override
-			public void run() {
-				try {
-                    System.out.println("TryMove2 is about to acquire tryPermit semaphore.");
-					tryPermits.acquire(1);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-				tryToAddMove(list, emptyIndex, emptyIndex + 4);
-                System.out.println("TryMove2 has performed tryToAddMove. Now releasing...");
-				tryPermits.release(1);
+			public Board call() {
+				Board b = tryToAddMove(emptyIndex, emptyIndex + 4);
+				return b;
 			}
 		});
-		threadPoolRef.execute(tryMove2);
+		board2 = threadPoolRef.submit(tryMove2);
 		
 		// left
-		Runnable tryMove3;
+        Future<Board> board3 = null;
+		Callable<Board> tryMove3;
 		if ( (emptyIndex % 4) != 0) {
-			tryMove3 = (new Runnable() {
+			tryMove3 = (new Callable<Board>() {
 				@Override
-				public void run() {
-					try {
-                        System.out.println("TryMove3 is about to acquire tryPermit semaphore.");
-						tryPermits.acquire(1);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-					tryToAddMove(list, emptyIndex, emptyIndex - 1);
-                    System.out.println("TryMove3 has performed tryToAddMove. Now releasing...");
-					tryPermits.release(1);
+				public Board call() {
+					Board b = tryToAddMove(emptyIndex, emptyIndex - 1);
+					return b;
 				}
 			});
-			threadPoolRef.execute(tryMove3);
+			board3 = threadPoolRef.submit(tryMove3);
 		}
 		
 		// right
-		Runnable tryMove4;
+		Callable<Board> tryMove4;
+		Future<Board> board4 = null;
 		if ( (emptyIndex % 4) != 3) {
-			tryMove4 = (new Runnable() {
+			tryMove4 = (new Callable<Board>() {
 				@Override
-				public void run() {
-					try {
-                        System.out.println("TryMove4 is about to acquire tryPermit semaphore.");
-						tryPermits.acquire(1);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-					tryToAddMove(list, emptyIndex, emptyIndex + 1);
-                    System.out.println("TryMove4 has performed tryToAddMove. Now releasing...");
-					tryPermits.release(1);
+				public Board call() throws Exception{
+					Board b = tryToAddMove(emptyIndex, emptyIndex + 1);
+					return b;
 				}
 			});
-			threadPoolRef.execute(tryMove4);
+			board4 = threadPoolRef.submit(tryMove4);
 		}
 
 		try {
-            if (tryPermits.availablePermits() < 4) System.out.println("GenSuccThreaded: Permits < 4. Permits: " + tryPermits.availablePermits());
-			tryPermits.acquire(4);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		tryPermits.release(4); // we immediately release cause we just want to block until above threads are done.
+            if (board1.get() != null) list.add(board1.get());
+            if (board2.get() != null) list.add(board2.get());
+            if (board3 != null && board3.get() != null) list.add(board3.get());
+            if (board4 != null && board4.get() != null) list.add(board4.get());
+        }
+        catch(Exception e)
+        {
+            e.printStackTrace();
+        }
 
 		return list;
 	}
@@ -166,26 +143,33 @@ public class Board {
 		int emptyIndex = this.getEmptyIndex();
 
 		// above
-		tryToAddMove(list,emptyIndex,emptyIndex - 4);
+		Board board1 = tryToAddMove(emptyIndex,emptyIndex - 4);
 
 		// below
-		tryToAddMove(list,emptyIndex,emptyIndex + 4);
+		Board board2 = tryToAddMove(emptyIndex,emptyIndex + 4);
 
 		// left
+        Board board3 = null;
 		if ( (emptyIndex % 4) != 0)
-			tryToAddMove(list,emptyIndex,emptyIndex - 1);
+			board3 = tryToAddMove(emptyIndex,emptyIndex - 1);
 
 		// right
+        Board board4 = null;
 		if ( (emptyIndex % 4) != 3)
-			tryToAddMove(list,emptyIndex,emptyIndex  + 1);
+			board4 = tryToAddMove(emptyIndex,emptyIndex  + 1);
+
+		if(board1 != null) list.add(board1);
+		if(board2 != null) list.add(board2);
+		if(board3 != null) list.add(board3);
+		if(board4 != null) list.add(board4);
 
 		return list;
 	}
 
-	private  final void tryToAddMove(List<Board> list, int emptyIndex, int targetIndex) {
+	private  final Board tryToAddMove(int emptyIndex, int targetIndex) {
 
 		if (! isValidIndex(targetIndex))
-			return;
+			return null;
 		int [] copy = new int[16];
 		System.arraycopy (this.board,0,copy,0,16);
 		
@@ -193,7 +177,7 @@ public class Board {
 		copy[targetIndex] = 0;
 
 		Board newBoardCopy = new Board(copy);
-		try {
+		/*try {
 		    if(listRWSem.availablePermits() < 1) System.out.println("listRWSem is blocked on thread " + Thread.currentThread().getId() +". Will acquire when free...");
             listRWSem.acquire(1);
             System.out.println("listRWSem Acquired by thread " + Thread.currentThread().getId());
@@ -202,9 +186,9 @@ public class Board {
         {
             e.printStackTrace();
         }
-		list.add(newBoardCopy);
 		System.out.println("listRWSem released by thread " + Thread.currentThread().getId());
-		listRWSem.release(1);
+		listRWSem.release(1);*/
+		return newBoardCopy;
 	}
 	
 	public boolean isSolved() {
