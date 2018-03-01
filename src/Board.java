@@ -80,12 +80,14 @@ public class Board {
 			@Override
 			public void run() {
 				try {
+				    System.out.println("TryMove1 is about to acquire tryPermit semaphore.");
 					tryPermits.acquire(1);
 				}
 				catch (InterruptedException e){
 					e.printStackTrace();
 				}
 				tryToAddMove(list,emptyIndex,emptyIndex - 4);
+				System.out.println("TryMove1 has performed tryToAddMove. Now releasing...");
 				tryPermits.release(1);
 			}
 		});
@@ -96,11 +98,13 @@ public class Board {
 			@Override
 			public void run() {
 				try {
+                    System.out.println("TryMove2 is about to acquire tryPermit semaphore.");
 					tryPermits.acquire(1);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
 				tryToAddMove(list, emptyIndex, emptyIndex + 4);
+                System.out.println("TryMove2 has performed tryToAddMove. Now releasing...");
 				tryPermits.release(1);
 			}
 		});
@@ -113,11 +117,13 @@ public class Board {
 				@Override
 				public void run() {
 					try {
+                        System.out.println("TryMove3 is about to acquire tryPermit semaphore.");
 						tryPermits.acquire(1);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
 					tryToAddMove(list, emptyIndex, emptyIndex - 1);
+                    System.out.println("TryMove3 has performed tryToAddMove. Now releasing...");
 					tryPermits.release(1);
 				}
 			});
@@ -131,11 +137,13 @@ public class Board {
 				@Override
 				public void run() {
 					try {
+                        System.out.println("TryMove4 is about to acquire tryPermit semaphore.");
 						tryPermits.acquire(1);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
 					tryToAddMove(list, emptyIndex, emptyIndex + 1);
+                    System.out.println("TryMove4 has performed tryToAddMove. Now releasing...");
 					tryPermits.release(1);
 				}
 			});
@@ -143,6 +151,7 @@ public class Board {
 		}
 
 		try {
+            if (tryPermits.availablePermits() < 4) System.out.println("GenSuccThreaded: Permits < 4. Permits: " + tryPermits.availablePermits());
 			tryPermits.acquire(4);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
@@ -185,13 +194,16 @@ public class Board {
 
 		Board newBoardCopy = new Board(copy);
 		try {
+		    if(listRWSem.availablePermits() < 1) System.out.println("listRWSem is blocked on thread " + Thread.currentThread().getId() +". Will acquire when free...");
             listRWSem.acquire(1);
+            System.out.println("listRWSem Acquired by thread " + Thread.currentThread().getId());
         }
         catch (InterruptedException e)
         {
             e.printStackTrace();
         }
 		list.add(newBoardCopy);
+		System.out.println("listRWSem released by thread " + Thread.currentThread().getId());
 		listRWSem.release(1);
 	}
 	

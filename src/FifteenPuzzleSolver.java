@@ -18,6 +18,7 @@ public class FifteenPuzzleSolver {
 	private ExecutorService threadPool;
 	private int arb;
 
+
 	public static void main(String [] args) {
 		int threadCount = 1;
 		
@@ -66,7 +67,7 @@ public class FifteenPuzzleSolver {
 				return solution;
 			}
 			else {
-				maxDepth++; // search again, with a larger maxDepth
+			    maxDepth++; // search again, with a larger maxDepth
 			}
 		}
 	}
@@ -89,30 +90,34 @@ public class FifteenPuzzleSolver {
 		}
 		
 		// stop searching if we can't solve the puzzle within our maximum depth allotment
-		if ((currentDepth + board.minimumSolutionDepth()) > maxDepth)
-			return null;
+		if ((currentDepth + board.minimumSolutionDepth()) > maxDepth) {
+            return null;
+        }
 		
-		// search for neighboring moves...
 
 		List<Board> nextMoves = board.generateSuccessorsThreaded();
 
-		for (Board nextBoard : nextMoves) {
-		    try
-            {
+		for (int i = 0; i < nextMoves.size(); i++) {
+		    Board nextBoard = nextMoves.get(i);
+            try {
+                if(nextBoard.listRWSem.availablePermits() < 1) System.out.println("listRWSem is blocked on thread " + Thread.currentThread().getId() +". Will acquire when free...");
                 nextBoard.listRWSem.acquire(1);
+                System.out.println("listRWSem Acquired by thread " + Thread.currentThread().getId());
             }
             catch (InterruptedException e)
             {
                 e.printStackTrace();
             }
+            System.out.println("listRWSem released by thread " + Thread.currentThread().getId());
+            nextBoard.listRWSem.release(1);
 			List<Board> solution = doSolve(nextBoard,currentDepth+1,maxDepth);
 			if (solution != null) {
+			    // Shutdown the thread pool
+                threadPool.shutdownNow();
 				// prepend this board to the solution, and return
 				solution.add(0,board);
-                nextBoard.listRWSem.release(1);
 				return solution;
 			}
-            nextBoard.listRWSem.release(1);
 		}
 		
 		// no successor moves were fruitful
